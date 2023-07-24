@@ -9,12 +9,14 @@
 #	include <bx/pixelformat.h>
 #	include "renderer_vk.h"
 #	include "shader_spirv.h"
+#	include <iostream>
 
 #if BX_PLATFORM_OSX
 #	import <Cocoa/Cocoa.h>
 #	import <Foundation/Foundation.h>
 #	import <QuartzCore/QuartzCore.h>
 #	import <Metal/Metal.h>
+#	include <vulkan-local/vulkan_metal.h>
 #endif // BX_PLATFORM_OSX
 
 namespace bgfx { namespace vk
@@ -342,7 +344,9 @@ VK_IMPORT_DEVICE
 			EXT_shader_viewport_index_layer,
 			EXT_custom_border_color,
 			KHR_draw_indirect_count,
-
+			#ifdef __APPLE__
+			EXT_metal_objects,
+			#endif
 			Count
 		};
 
@@ -367,6 +371,9 @@ VK_IMPORT_DEVICE
 		{ "VK_EXT_shader_viewport_index_layer",     1, false, false, true                                                         , Layer::Count },
 		{ "VK_EXT_custom_border_color",             1, false, false, true                                                         , Layer::Count },
 		{ "VK_KHR_draw_indirect_count",             1, false, false, true                                                         , Layer::Count },
+		#ifdef __APPLE__
+		{ "VK_EXT_metal_objects",             		1, false, false, true                                                         , Layer::Count },
+		#endif
 	};
 	BX_STATIC_ASSERT(Extension::Count == BX_COUNTOF(s_extension) );
 
@@ -1163,9 +1170,10 @@ VK_IMPORT_DEVICE
 #endif // BX_PLATFORM_*
 					);
 
+
 			if (NULL == m_vulkan1Dll)
 			{
-				BX_TRACE("Init error: Failed to load vulkan dynamic library.");
+				BX_TRACE("Init error: Failed to load vulkan dynamic library.");				
 				goto error;
 			}
 
@@ -1199,6 +1207,9 @@ VK_IMPORT
 				s_extension[Extension::EXT_shader_viewport_index_layer].m_initialize = !!(_init.capabilities & BGFX_CAPS_VIEWPORT_LAYER_ARRAY);
 				s_extension[Extension::EXT_conservative_rasterization ].m_initialize = !!(_init.capabilities & BGFX_CAPS_CONSERVATIVE_RASTER );
 				s_extension[Extension::KHR_draw_indirect_count        ].m_initialize = !!(_init.capabilities & BGFX_CAPS_DRAW_INDIRECT_COUNT );
+				#ifdef __APPLE__
+				s_extension[Extension::EXT_metal_objects			  ].m_initialize = true;
+				#endif
 
 				dumpExtensions(VK_NULL_HANDLE, s_extension);
 
@@ -1290,9 +1301,17 @@ VK_IMPORT
 					vulkanApiVersionSelector = VK_API_VERSION_1_0;
 				}
 
+				#if BX_PLATFORM_OSX
+					VkExportMetalObjectCreateInfoEXT eoci;
+
+					eoci.sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT;
+					eoci.pNext = nullptr;
+					eoci.exportObjectType =  VkExportMetalObjectTypeFlagBitsEXT::VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT;
+				#endif
+
 				VkApplicationInfo appInfo;
 				appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-				appInfo.pNext = NULL;
+				appInfo.pNext = nullptr;
 				appInfo.pApplicationName   = "bgfx";
 				appInfo.applicationVersion = BGFX_API_VERSION;
 				appInfo.pEngineName        = "bgfx";
@@ -1301,7 +1320,13 @@ VK_IMPORT
 
 				VkInstanceCreateInfo ici;
 				ici.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-				ici.pNext = NULL;
+				ici.pNext = 
+								#if BX_PLATFORM_OSX
+								&eoci
+								#else
+								nullptr;
+								#endif
+							;;
 #if BX_PLATFORM_OSX
 				ici.flags = 0 | VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #else
@@ -1357,6 +1382,7 @@ VK_IMPORT_INSTANCE
 				BX_TRACE("Init error: Failed to load instance functions.");
 				goto error;
 			}
+
 
 			m_debugReportCallback = VK_NULL_HANDLE;
 
@@ -2036,7 +2062,10 @@ VK_IMPORT_DEVICE
 				goto error;
 			}
 
-			g_internalData.context = m_device;
+			g_internalData.context = (void*)&m_device;
+			g_internalData.physicalDevice = (void*)&m_physicalDevice;
+			g_internalData.instance = (void*)&m_instance;
+
 			return true;
 
 		error:
@@ -2362,9 +2391,9 @@ VK_IMPORT_DEVICE
 		{
 		}
 
-		uintptr_t getInternal(TextureHandle /*_handle*/) override
+		uintptr_t getInternal(TextureHandle _handle) override
 		{
-			return 0;
+			return reinterpret_cast<uintptr_t>(&m_textures[_handle.idx].m_textureImage);
 		}
 
 		void destroyTexture(TextureHandle _handle) override
@@ -5744,10 +5773,24 @@ VK_DESTROY
 			BX_ASSERT(m_numMips <= 1, "Can't create multisample image with mip chain.");
 		}
 
+		#ifdef BX_PLATFORM_OSX
+			VkExportMetalObjectCreateInfoEXT eoci;
+
+			eoci.sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT;
+			eoci.pNext = nullptr;
+			eoci.exportObjectType = VkExportMetalObjectTypeFlagBitsEXT::VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT;
+		#endif
+
 		// create texture and allocate its device memory
 		VkImageCreateInfo ici;
 		ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ici.pNext = NULL;
+		ici.pNext = 
+					#ifdef BX_PLATFORM_OSX
+						&eoci
+					#else
+						NULL
+					#endif
+		;
 		ici.flags = 0
 			| (VK_IMAGE_VIEW_TYPE_CUBE == m_type
 				? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT

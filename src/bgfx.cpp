@@ -374,6 +374,14 @@ namespace bgfx
 		return &g_internalData;
 	}
 
+	uintptr_t getInternal(TextureHandle _handle)
+	{
+		BGFX_CHECK_RENDER_THREAD();
+		RendererContextI* rci = s_ctx->m_renderCtx;
+
+		return rci->getInternal(_handle);
+	}
+
 	uintptr_t overrideInternal(TextureHandle _handle, uintptr_t _ptr)
 	{
 		BGFX_CHECK_RENDER_THREAD();

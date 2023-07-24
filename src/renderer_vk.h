@@ -217,6 +217,8 @@
 			/* VK_KHR_draw_indirect_count */                                \
 			VK_IMPORT_DEVICE_FUNC(true,  vkCmdDrawIndirectCountKHR);        \
 			VK_IMPORT_DEVICE_FUNC(true,  vkCmdDrawIndexedIndirectCountKHR); \
+			/* VK_EXT_metal_objects */										\
+			VK_IMPORT_DEVICE_FUNC(true,  vkExportMetalObjectsEXT);			\
 
 #define VK_DESTROY                                \
 			VK_DESTROY_FUNC(Buffer);              \

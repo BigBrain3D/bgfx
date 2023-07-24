@@ -65,7 +65,10 @@ namespace bgfx
 	struct InternalData
 	{
 		const struct Caps* caps; //!< Renderer capabilities.
-		void* context;           //!< GL context, or D3D device.
+		void* context;           //!< GL context, or D3D device or MTL device.
+		void* queue; 			//!< MTL Command Queue*
+		void* physicalDevice;	//!< VK Physical Device*
+		void* instance;
 	};
 
 	/// Get internal data for interop.
@@ -96,6 +99,8 @@ namespace bgfx
 	/// @attention C99's equivalent binding is `bgfx_override_internal_texture_ptr`.
 	///
 	uintptr_t overrideInternal(TextureHandle _handle, uintptr_t _ptr);
+
+	uintptr_t getInternal(TextureHandle _handle);
 
 	/// Override internal texture by creating new texture. Previously created
 	/// internal texture will released.

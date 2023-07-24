@@ -10,6 +10,8 @@
 #include "renderer_mtl.h"
 #include "renderer.h"
 
+#include <iostream>
+
 #if BX_PLATFORM_OSX
 #	include <Cocoa/Cocoa.h>
 #endif
@@ -799,6 +801,7 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 			m_gpuTimer.init();
 
 			g_internalData.context = m_device;
+			g_internalData.queue = (id<MTLCommandQueue>)m_cmd.m_commandQueue;
 
 			return true;
 		}
@@ -2337,7 +2340,21 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 
 					if (NULL != reflection)
 					{
-						processArguments(pso, reflection.vertexBindings, reflection.fragmentBindings);
+						{
+#if BX_PLATFORM_IOS
+							if (@available(iOS 16, *)) {
+								processArguments(pso, reflection.vertexBindings, reflection.fragmentBindings);
+							} else {
+								processArguments(pso, reflection.vertexArguments, reflection.fragmentArguments);
+							}
+#elif BX_PLATFORM_OSX
+							if (@available(macOS 13, *)) {
+								processArguments(pso, reflection.vertexBindings, reflection.fragmentBindings);
+							} else {
+								processArguments(pso, reflection.vertexArguments, reflection.fragmentArguments);
+							}
+#endif
+						}
 					}
 				}
 
@@ -2384,7 +2401,22 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 					, MTLPipelineOptionBufferTypeInfo
 					, &reflection
 					);
-				processArguments(pso, reflection.bindings, NULL);
+
+				{
+#if BX_PLATFORM_IOS
+					if (@available(iOS 16, *)) {
+						processArguments(pso, reflection.bindings, NULL);
+					} else {
+						processArguments(pso, reflection.arguments, NULL);
+					}
+#elif BX_PLATFORM_OSX
+					if (@available(macOS 13, *)) {
+						processArguments(pso, reflection.bindings, NULL);
+					} else {
+						processArguments(pso, reflection.arguments, NULL);
+					}
+#endif
+				}
 
 				for (uint32_t ii = 0; ii < 3; ++ii)
 				{
@@ -4412,7 +4444,6 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 					continue;
 				}
 
-
 				bool resetState = viewChanged || wasCompute;
 
 				if (wasCompute)
@@ -4613,6 +4644,9 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 						streamMask >>= ntz;
 						idx         += ntz;
 
+						// HACK! Fix out of bounds writing
+						if ( idx >= BGFX_CONFIG_MAX_VERTEX_STREAMS ) break;
+
 						currentState.m_stream[idx].m_layoutHandle   = draw.m_stream[idx].m_layoutHandle;
 						currentState.m_stream[idx].m_handle         = draw.m_stream[idx].m_handle;
 						currentState.m_stream[idx].m_startVertex    = draw.m_stream[idx].m_startVertex;
@@ -4634,7 +4668,7 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 							);
 						const uint32_t offset = draw.m_stream[idx].m_startVertex * stride;
 
-						rce.setVertexBuffer(vb.m_ptr, offset, idx+1);
+						rce.setVertexBuffer( draw.m_streamMask != 0xFF ? vb.m_ptr : nil, draw.m_streamMask != 0xFF ? offset : 0x00, idx+1);
 					}
 
 					if (!isValid(currentProgram) )
@@ -4930,6 +4964,7 @@ BX_STATIC_ASSERT(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNa
 			{
 				captureElapsed = -bx::getHPCounter();
 				capture();
+				
 				rce = m_renderCommandEncoder;
 				captureElapsed += bx::getHPCounter();
 
