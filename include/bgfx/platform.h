@@ -69,6 +69,7 @@ namespace bgfx
 		void* queue; 			//!< MTL Command Queue*
 		void* physicalDevice;	//!< VK Physical Device*
 		void* instance;
+		uint32_t queueFamily;
 	};
 
 	/// Get internal data for interop.

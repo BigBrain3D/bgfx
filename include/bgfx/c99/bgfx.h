@@ -593,6 +593,7 @@ typedef struct bgfx_internal_data_s
     void*                queue;              /** MTL Command Queue */
     void*                physicalDevice;     /** VK Phyisical Device */
     void*                instance;
+    uint32_t             queueFamily;       /** VK Queue Family */
 } bgfx_internal_data_t;
 
 /**

@@ -147,6 +147,9 @@ namespace bgfx { namespace vk
 VK_IMPORT
 VK_IMPORT_INSTANCE
 VK_IMPORT_DEVICE
+#if BX_PLATFORM_OSX
+VK_IMPORT_DEVICE_FUNC(true,  vkExportMetalObjectsEXT);
+#endif
 #undef VK_IMPORT_DEVICE_FUNC
 #undef VK_IMPORT_INSTANCE_FUNC
 #undef VK_IMPORT_FUNC
@@ -344,7 +347,7 @@ VK_IMPORT_DEVICE
 			EXT_shader_viewport_index_layer,
 			EXT_custom_border_color,
 			KHR_draw_indirect_count,
-			#ifdef __APPLE__
+			#if BX_PLATFORM_OSX
 			EXT_metal_objects,
 			#endif
 			Count
@@ -1324,9 +1327,9 @@ VK_IMPORT
 								#if BX_PLATFORM_OSX
 								&eoci
 								#else
-								nullptr;
+								nullptr
 								#endif
-							;;
+							;
 #if BX_PLATFORM_OSX
 				ici.flags = 0 | VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #else
@@ -1895,6 +1898,9 @@ VK_IMPORT_INSTANCE
 			BX_TRACE("\t%p " #_func, _func);                            \
 			imported &= _optional || NULL != _func
 VK_IMPORT_DEVICE
+#if BX_PLATFORM_OSX
+VK_IMPORT_DEVICE_FUNC(true,  vkExportMetalObjectsEXT);
+#endif
 #undef VK_IMPORT_DEVICE_FUNC
 
 			if (!imported)
@@ -2065,6 +2071,7 @@ VK_IMPORT_DEVICE
 			g_internalData.context = (void*)&m_device;
 			g_internalData.physicalDevice = (void*)&m_physicalDevice;
 			g_internalData.instance = (void*)&m_instance;
+			g_internalData.queueFamily = m_globalQueueFamily;
 
 			return true;
 
@@ -5773,7 +5780,7 @@ VK_DESTROY
 			BX_ASSERT(m_numMips <= 1, "Can't create multisample image with mip chain.");
 		}
 
-		#ifdef BX_PLATFORM_OSX
+		#if BX_PLATFORM_OSX
 			VkExportMetalObjectCreateInfoEXT eoci;
 
 			eoci.sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT;
@@ -5785,7 +5792,7 @@ VK_DESTROY
 		VkImageCreateInfo ici;
 		ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		ici.pNext = 
-					#ifdef BX_PLATFORM_OSX
+					#if BX_PLATFORM_OSX
 						&eoci
 					#else
 						NULL
